@@ -1,0 +1,5 @@
+{
+  "name": "Gerador de Procurações Jurídicas",
+  "description": "Um sistema web para a geração automatizada de procurações jurídicas a partir de planilhas. Extrai dados, valida-os com IA, e gera documentos nos formatos .docx e .pdf, agilizando o processo manual.",
+  "requestFramePermissions": []
+}
