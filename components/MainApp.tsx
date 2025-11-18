@@ -1,7 +1,8 @@
+
 import React, { useState, useCallback, ChangeEvent, useMemo, useEffect } from 'react';
 import { ProcuracaoData, HistoryItem } from '../types';
 import { parseSpreadsheet } from '../services/documentService';
-import { analyzeDataWithGemini, correctGrammarWithGemini } from '../services/geminiService';
+import { analyzeDataWithGemini, correctDataWithGemini } from '../services/geminiService';
 import { generateDocx, generatePdf, generateAbntDocx, createFilename } from '../services/documentService';
 import ProcuracaoForm from './ProcuracaoForm';
 import ProcuracaoPreview from './ProcuracaoPreview';
@@ -56,10 +57,10 @@ const MainApp: React.FC = () => {
             setIsCorrecting(true);
             setAiAnalysis(''); 
             try {
-                const doc = await correctGrammarWithGemini(rawSelectedDoc);
+                const doc = await correctDataWithGemini(rawSelectedDoc);
                 setCorrectedDoc(doc);
             } catch (error) {
-                console.error("Failed to correct grammar with AI:", error);
+                console.error("Failed to correct data with AI:", error);
                 setCorrectedDoc(rawSelectedDoc); // Fallback to raw doc on error
             } finally {
                 setIsCorrecting(false);
@@ -310,7 +311,7 @@ const MainApp: React.FC = () => {
                         {isCorrecting ? (
                             <div className="mt-2 flex items-center space-x-2 text-sm text-blue-500 animate-pulse">
                                 <BrainCircuitIcon className="w-5 h-5"/>
-                                <span>Ajustando gramática com IA...</span>
+                                <span>Verificando e corrigindo dados com IA...</span>
                             </div>
                         ) : (
                             <div className={`mt-2 flex items-center space-x-2 text-sm ${validationStatus.valid ? 'text-green-600' : 'text-yellow-600'}`}>

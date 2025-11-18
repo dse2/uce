@@ -1,8 +1,9 @@
+
 import { GoogleGenAI, Type } from "@google/genai";
 import { ProcuracaoData } from '../types';
 
 // Assume process.env.API_KEY is available in the execution environment
-const API_KEY = import.meta.env.VITE_GOOGLE_API_KEY;
+const API_KEY = process.env.API_KEY;
 
 if (!API_KEY) {
   console.warn("API key for Gemini is not set. AI features will not work.");
@@ -10,57 +11,81 @@ if (!API_KEY) {
 
 const ai = new GoogleGenAI({ apiKey: API_KEY });
 
-export const correctGrammarWithGemini = async (data: ProcuracaoData): Promise<ProcuracaoData> => {
+export const correctDataWithGemini = async (data: ProcuracaoData): Promise<ProcuracaoData> => {
     if (!API_KEY) {
-        console.warn("API key for Gemini is not set. Grammar correction will be skipped.");
+        console.warn("API key for Gemini is not set. Data correction will be skipped.");
         return data;
     }
 
-    const procurador1Nome = data.procurador1_nome || '';
-    const procurador1Nacionalidade = data.procurador1_nacionalidade || '';
-    const procurador2Nome = data.procurador2_nome || '';
-    const procurador2Nacionalidade = data.procurador2_nacionalidade || '';
-    
-    // Do not call the API if there are no names to check.
-    if (!procurador1Nome && !procurador2Nome) {
-        return data;
-    }
-    
-    // Skip if nationalities are missing, as there's nothing to correct.
-    if (!procurador1Nacionalidade && !procurador2Nacionalidade) {
-        return data;
-    }
+    // Prepare a subset of data for correction to focus the model
+    // Convert all to string to match schema expectations, empty string if undefined
+    const inputData = {
+        procurador1_nome: String(data.procurador1_nome || ''),
+        procurador1_nacionalidade: String(data.procurador1_nacionalidade || ''),
+        procurador1_profissao: String(data.procurador1_profissao || ''),
+        procurador1_estado_civil: String(data.procurador1_estado_civil || ''),
+        procurador1_endereco: String(data.procurador1_endereco || ''),
 
+        procurador2_nome: String(data.procurador2_nome || ''),
+        procurador2_nacionalidade: String(data.procurador2_nacionalidade || ''),
+        procurador2_profissao: String(data.procurador2_profissao || ''),
+        procurador2_estado_civil: String(data.procurador2_estado_civil || ''),
+        procurador2_endereco: String(data.procurador2_endereco || ''),
+
+        obra: String(data.obra || ''),
+        cidade_emissao: String(data.cidade_emissao || 'Belo Horizonte') // Default if missing
+    };
+    
+    // If main fields are empty, skip
+    if (!inputData.procurador1_nome && !inputData.procurador2_nome && !inputData.obra) {
+        return data;
+    }
 
     const model = "gemini-2.5-flash";
     const prompt = `
-        Analise os nomes e nacionalidades a seguir. Com base no nome, determine o gênero gramatical correto para a nacionalidade em português.
-        Por exemplo, se o nome for "Pedro" e a nacionalidade "brasileira", corrija para "brasileiro".
-        Se o nome for "Ana" e a nacionalidade "brasileiro", corrija para "brasileira".
-        Se um nome não estiver presente, retorne a nacionalidade original ou uma string vazia se a original também for vazia.
-        Se a nacionalidade já estiver correta, mantenha-a.
+        Você é um assistente de revisão jurídica especializado em corrigir erros de digitação e gramática em dados cadastrais.
         
-        Dados:
-        - Procurador 1: Nome: "${procurador1Nome}", Nacionalidade Atual: "${procurador1Nacionalidade}"
-        - Procurador 2: Nome: "${procurador2Nome}", Nacionalidade Atual: "${procurador2Nacionalidade}"
-
-        Retorne APENAS o JSON com as nacionalidades corrigidas. Não inclua markdown backticks ou qualquer outro texto.
+        Sua tarefa:
+        1. Analise os campos do JSON fornecido (nomes, nacionalidades, profissões, endereços, obra, cidade).
+        2. Corrija erros de ortografia (ex: "Engenhero" -> "Engenheiro", "Rau" -> "Rua").
+        3. Corrija acentuação (ex: "Jao" -> "João", "Sao Paulo" -> "São Paulo").
+        4. Ajuste a capitalização (ex: "maria da silva" -> "Maria da Silva").
+        5. Ajuste a concordância de gênero da nacionalidade e estado civil com base no nome do procurador (ex: "Maria", "Brasileiro" -> "Brasileira").
+        6. Se o endereço estiver desformatado mas legível, corrija a escrita dos logradouros (ex: "Av." em vez de "avenida", ou vice-versa para padronizar, preferência para norma culta).
+        
+        REGRAS CRÍTICAS:
+        - NÃO altere números (números de casa, apto, CEP, etc).
+        - NÃO invente dados. Se um campo estiver vazio ou "N/A", mantenha vazio.
+        - NÃO altere o sentido da informação (ex: não mude o nome da rua, apenas corrija a grafia se estiver errada).
+        
+        Dados de Entrada:
+        ${JSON.stringify(inputData)}
     `;
     
     try {
         const responseSchema = {
             type: Type.OBJECT,
             properties: {
-                procurador1_nacionalidade: { 
-                    type: Type.STRING,
-                    description: "Nacionalidade corrigida para o procurador 1." 
-                },
-                procurador2_nacionalidade: { 
-                    type: Type.STRING,
-                    description: "Nacionalidade corrigida para o procurador 2."
-                },
+                procurador1_nome: { type: Type.STRING },
+                procurador1_nacionalidade: { type: Type.STRING },
+                procurador1_profissao: { type: Type.STRING },
+                procurador1_estado_civil: { type: Type.STRING },
+                procurador1_endereco: { type: Type.STRING },
+                
+                procurador2_nome: { type: Type.STRING },
+                procurador2_nacionalidade: { type: Type.STRING },
+                procurador2_profissao: { type: Type.STRING },
+                procurador2_estado_civil: { type: Type.STRING },
+                procurador2_endereco: { type: Type.STRING },
+                
+                obra: { type: Type.STRING },
+                cidade_emissao: { type: Type.STRING },
             },
-            required: ['procurador1_nacionalidade', 'procurador2_nacionalidade']
+            required: [
+                'procurador1_nome', 'procurador1_nacionalidade', 'procurador1_profissao', 'procurador1_estado_civil', 'procurador1_endereco',
+                'procurador2_nome', 'procurador2_nacionalidade', 'procurador2_profissao', 'procurador2_estado_civil', 'procurador2_endereco',
+                'obra', 'cidade_emissao'
+            ]
         };
 
         const response = await ai.models.generateContent({
@@ -75,20 +100,35 @@ export const correctGrammarWithGemini = async (data: ProcuracaoData): Promise<Pr
         const jsonText = response.text.trim();
         const correctedValues = JSON.parse(jsonText);
 
+        // Merge corrected values back into the original data object
         const newData = { ...data };
         
-        if (procurador1Nome && typeof correctedValues.procurador1_nacionalidade === 'string') {
-            newData.procurador1_nacionalidade = correctedValues.procurador1_nacionalidade;
-        }
+        // Helper to update only if new value is valid string
+        const updateIfValid = (key: string) => {
+            if (correctedValues[key] !== undefined && correctedValues[key] !== null) {
+                newData[key] = correctedValues[key];
+            }
+        };
 
-        if (procurador2Nome && typeof correctedValues.procurador2_nacionalidade === 'string') {
-            newData.procurador2_nacionalidade = correctedValues.procurador2_nacionalidade;
-        }
+        updateIfValid('procurador1_nome');
+        updateIfValid('procurador1_nacionalidade');
+        updateIfValid('procurador1_profissao');
+        updateIfValid('procurador1_estado_civil');
+        updateIfValid('procurador1_endereco');
+        
+        updateIfValid('procurador2_nome');
+        updateIfValid('procurador2_nacionalidade');
+        updateIfValid('procurador2_profissao');
+        updateIfValid('procurador2_estado_civil');
+        updateIfValid('procurador2_endereco');
+
+        updateIfValid('obra');
+        updateIfValid('cidade_emissao');
 
         return newData;
 
     } catch (error) {
-        console.error("Error calling Gemini API for grammar correction:", error);
+        console.error("Error calling Gemini API for data correction:", error);
         // Returns original data in case of error
         return data;
     }
