@@ -3,7 +3,7 @@ import { GoogleGenAI, Type } from "@google/genai";
 import { ProcuracaoData } from '../types';
 
 // Assume process.env.API_KEY is available in the execution environment
-const API_KEY = process.env.API_KEY;
+const API_KEY = import.meta.env.VITE_GOOGLE_API_KEY;
 
 if (!API_KEY) {
   console.warn("API key for Gemini is not set. AI features will not work.");
